@@ -104,7 +104,25 @@ export const ProjectSchema = z
 export type Project = z.infer<typeof ProjectSchema>;
 export type Animation = Project['animations'][number];
 
-export const blankFrame = (width: number, height: number): Frame => Array.from({ length: height }, () => TRANSPARENT.repeat(width));
+/** Busca una animación por nombre; con `frame`, también el cuadro. Lanza ValidationError con las opciones válidas. */
+export function findAnimation(project: Project, animation: string): number {
+  const a = project.animations.findIndex((x) => x.name === animation);
+  if (a < 0) {
+    const names = project.animations.map((x) => x.name).join(', ');
+    throw new ValidationError([`Animación '${animation}' no existe. Disponibles: ${names}`]);
+  }
+  return a;
+}
+
+export function findFrame(project: Project, animation: string, frame: number): { a: number; rows: Frame } {
+  const a = findAnimation(project, animation);
+  const frames = project.animations[a]!.frames;
+  const rows = frames[frame];
+  if (!rows) throw new ValidationError([`Cuadro ${frame} no existe en '${animation}': tiene ${frames.length} cuadros (0 a ${frames.length - 1})`]);
+  return { a, rows };
+}
+
+export const blankFrame =(width: number, height: number): Frame => Array.from({ length: height }, () => TRANSPARENT.repeat(width));
 
 export function slugify(name: string): string {
   const slug = name
