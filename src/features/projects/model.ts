@@ -19,6 +19,14 @@ export class ValidationError extends Error {
   }
 }
 
+/** Lo pedido no existe (proyecto, por ahora). */
+export class NotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotFoundError';
+  }
+}
+
 function formatIssues(issues: z.core.$ZodIssue[]): string[] {
   return issues.map((i) => {
     // En las claves de un record, el mensaje útil viene anidado.

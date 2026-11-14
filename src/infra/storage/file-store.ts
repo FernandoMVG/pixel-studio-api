@@ -1,7 +1,7 @@
-import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseProject, ValidationError, type Project } from '../../features/projects/model.ts';
-import type { ProjectStore } from './project-store.ts';
+import type { ProjectStore } from '../../features/projects/store.ts';
 
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -45,6 +45,17 @@ export class FileStore implements ProjectStore {
       return parseProject(data);
     } catch (e) {
       if (e instanceof ValidationError) throw new ValidationError(e.issues.map((m) => `${name}: ${m}`));
+      throw e;
+    }
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const file = this.path(id);
+    try {
+      await rm(file);
+      return true;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return false;
       throw e;
     }
   }

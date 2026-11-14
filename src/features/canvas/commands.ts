@@ -85,14 +85,22 @@ export function fill(project: Project, input: z.input<typeof FillInput>): Comman
   return commit(project, animation, frame, next);
 }
 
-function applyPatch(project: Project, patch: PixelPatch, side: 'before' | 'after'): Project {
+/** Aplica un parche (pone los valores `after`). Es lo mismo que hacen los clientes al recibirlo. */
+export function applyPatch(project: Project, patch: PixelPatch): Project {
   const next = [...locate(project, patch.animation, patch.frame).rows];
-  const changes = side === 'before' ? [...patch.changes].reverse() : patch.changes;
-  for (const c of changes) next[c.y] = setChar(next[c.y]!, c.x, c[side]);
+  for (const c of patch.changes) next[c.y] = setChar(next[c.y]!, c.x, c.after);
   return commit(project, patch.animation, patch.frame, next).project;
 }
 
-/** Deshace un parche: vuelve a poner los valores `before`. */
-export const undo = (project: Project, patch: PixelPatch) => applyPatch(project, patch, 'before');
-/** Rehace un parche: vuelve a poner los valores `after`. */
-export const redo = (project: Project, patch: PixelPatch) => applyPatch(project, patch, 'after');
+/** El parche que deshace a `patch`: intercambia antes y después, en orden inverso. */
+export const invert = (patch: PixelPatch): PixelPatch => ({
+  ...patch,
+  changes: [...patch.changes].reverse().map((c) => ({ ...c, before: c.after, after: c.before })),
+});
+
+export const undo = (project: Project, patch: PixelPatch) => applyPatch(project, invert(patch));
+export const redo = applyPatch;
+
+/** Comandos de dibujo por nombre, para lotes que llegan por HTTP o MCP. */
+export const COMMANDS = { setPixels, setRows, fill } as const;
+export type CommandName = keyof typeof COMMANDS;
