@@ -5,7 +5,7 @@ import { ProjectsService } from '../projects/service.ts';
 import type { CanvasEvent } from './publisher.ts';
 import { CanvasService } from './service.ts';
 
-it('aplica lotes atómicos, deshace por sesión y publica cada cambio', async () => {
+it('aplica lotes atómicos, deshace por sesión (píxeles y estructura) y publica cada cambio', async () => {
   const store = new MemoryStore();
   const events: CanvasEvent[] = [];
   const canvas = new CanvasService(store, { publish: (e) => events.push(e) });
@@ -33,5 +33,14 @@ it('aplica lotes atómicos, deshace por sesión y publica cada cambio', async ()
   await canvas.redo('bruma', { sessionId: 'web' });
   expect(await pixel(0, 0)).toBe('K');
 
-  expect(events.map((e) => `${e.sessionId}:${e.patches[0]!.changes[0]!.after}`)).toEqual(['web:K', 'agente:P', 'web:.', 'web:K']);
+  const after = (e: CanvasEvent) => { const p = e.patches[0]!; return p.kind === 'pixels' ? p.changes[0]!.after : `+${p.after?.frames.length}`; };
+  expect(events.map((e) => `${e.sessionId}:${after(e)}`)).toEqual(['web:K', 'agente:P', 'web:.', 'web:K']);
+
+  // Estructura y píxeles en el mismo lote: se deshacen juntos.
+  await canvas.apply('bruma', { sessionId: 'web', commands: [{ type: 'addFrame', animation: 'reposo', copyOf: 0 }, { type: 'setPixels', animation: 'reposo', frame: 1, pixels: [{ x: 3, y: 3, color: 'W' }] }] });
+  expect((await projects.get('bruma')).animations[0]!.frames).toHaveLength(2);
+  await canvas.undo('bruma', { sessionId: 'web' });
+  expect((await projects.get('bruma')).animations[0]!.frames).toHaveLength(1);
+  await canvas.redo('bruma', { sessionId: 'web' });
+  expect((await projects.get('bruma')).animations[0]!.frames[1]![3]![3]).toBe('W');
 });

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { NotFoundError, parse, ValidationError, type Project } from '../projects/model.ts';
 import type { ProjectStore } from '../projects/store.ts';
-import { applyPatch, COMMANDS, invert, type PixelPatch } from './commands.ts';
+import { applyPatch, COMMANDS, invert, type Patch } from './commands.ts';
 import type { PatchPublisher } from './publisher.ts';
 
 const HISTORY_LIMIT = 100;
@@ -12,7 +12,7 @@ const BatchInput = z.object({
 });
 const SessionInput = z.object({ sessionId: z.string().min(1, 'Indica el id de sesión') });
 
-type History = { undo: PixelPatch[][]; redo: PixelPatch[][] };
+type History = { undo: Patch[][]; redo: Patch[][] };
 
 export class CanvasService {
   readonly #store: ProjectStore;
@@ -26,17 +26,17 @@ export class CanvasService {
   }
 
   /** Aplica todos los comandos o ninguno. Un lote es un solo paso de deshacer. */
-  apply(projectId: string, input: z.input<typeof BatchInput>): Promise<PixelPatch[]> {
+  apply(projectId: string, input: z.input<typeof BatchInput>): Promise<Patch[]> {
     const { sessionId, commands } = parse(BatchInput, input);
     return this.#write(projectId, sessionId, (project) => {
-      const patches: PixelPatch[] = [];
+      const patches: Patch[] = [];
       commands.forEach(({ type, ...args }, i) => {
-        const run = COMMANDS[type as keyof typeof COMMANDS];
+        const run = COMMANDS[type as keyof typeof COMMANDS] as ((p: Project, a: unknown) => { project: Project; patch: Patch }) | undefined;
         if (!run) throw new ValidationError([`Comando ${i} ('${type}') no existe. Disponibles: ${Object.keys(COMMANDS).join(', ')}`]);
         try {
-          const r = run(project, args as never);
+          const r = run(project, args);
           project = r.project;
-          if (r.patch.changes.length) patches.push(r.patch);
+          if (r.patch.kind === 'animation' || r.patch.changes.length) patches.push(r.patch);
         } catch (e) {
           if (e instanceof ValidationError) throw new ValidationError(e.issues.map((m) => `Comando ${i} (${type}): ${m}`));
           throw e;
@@ -46,23 +46,30 @@ export class CanvasService {
     });
   }
 
-  undo(projectId: string, input: z.input<typeof SessionInput>): Promise<PixelPatch[]> {
+  undo(projectId: string, input: z.input<typeof SessionInput>): Promise<Patch[]> {
     return this.#step(projectId, parse(SessionInput, input).sessionId, 'undo', 'redo');
   }
 
-  redo(projectId: string, input: z.input<typeof SessionInput>): Promise<PixelPatch[]> {
+  redo(projectId: string, input: z.input<typeof SessionInput>): Promise<Patch[]> {
     return this.#step(projectId, parse(SessionInput, input).sessionId, 'redo', 'undo');
   }
 
   /** Deshacer/rehacer: aplica el lote guardado (invertido al deshacer) y lo pasa a la otra pila. Sin nada que hacer, devuelve []. */
-  #step(projectId: string, sessionId: string, from: keyof History, to: keyof History): Promise<PixelPatch[]> {
+  #step(projectId: string, sessionId: string, from: keyof History, to: keyof History): Promise<Patch[]> {
     return this.#write(projectId, sessionId, (project) => {
       const stack = this.#stack(projectId, sessionId);
       const entry = stack[from].at(-1);
       if (!entry) return { project, patches: [] };
       // ponytail: deshacer repone los valores `before` aunque otra sesión los haya cambiado después; basta para un solo usuario.
       const patches = from === 'undo' ? [...entry].reverse().map(invert) : entry;
-      for (const p of patches) project = applyPatch(project, p);
+      try {
+        for (const p of patches) project = applyPatch(project, p);
+      } catch (e) {
+        // Otra sesión cambió la estructura (p. ej. borró el cuadro): esta entrada ya no se puede aplicar, se descarta.
+        stack[from].pop();
+        if (e instanceof ValidationError) throw new ValidationError(e.issues.map((m) => `No se pudo ${from === 'undo' ? 'deshacer' : 'rehacer'}: ${m}`));
+        throw e;
+      }
       return { project, patches, saved: () => (stack[from].pop(), this.#push(projectId, sessionId, to, entry, false)) };
     });
   }
@@ -71,8 +78,8 @@ export class CanvasService {
   #write(
     projectId: string,
     sessionId: string,
-    fn: (p: Project) => { project: Project; patches: PixelPatch[]; saved?: () => void },
-  ): Promise<PixelPatch[]> {
+    fn: (p: Project) => { project: Project; patches: Patch[]; saved?: () => void },
+  ): Promise<Patch[]> {
     const prev = this.#queues.get(projectId) ?? Promise.resolve();
     const next = prev.catch(() => {}).then(async () => {
       const current = await this.#store.get(projectId);
@@ -95,7 +102,7 @@ export class CanvasService {
     return h;
   }
 
-  #push(projectId: string, sessionId: string, to: keyof History, entry: PixelPatch[], clearRedo: boolean) {
+  #push(projectId: string, sessionId: string, to: keyof History, entry: Patch[], clearRedo: boolean) {
     const h = this.#stack(projectId, sessionId);
     h[to].push(entry);
     if (h[to].length > HISTORY_LIMIT) h[to].shift();
