@@ -7,7 +7,7 @@ import { NotFoundError, ValidationError } from '../../features/projects/model.ts
 import { projectsRoutes } from '../../features/projects/routes.ts';
 import type { ProjectsService } from '../../features/projects/service.ts';
 
-const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+import { LOCAL_ORIGIN } from './origin.ts';
 
 export function createApp(deps: { projects: ProjectsService; canvas: CanvasService }): Hono {
   const app = new Hono();
