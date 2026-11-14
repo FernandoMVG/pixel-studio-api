@@ -160,6 +160,16 @@ export function createAgentServer({ projects, canvas }: Deps, perms: AgentPermis
   );
 
   server.registerTool(
+    'set_palette',
+    {
+      description:
+        'Reemplaza la paleta completa (de 4 a 6 colores, letras A–Z). Puedes cambiar colores y nombres o añadir letras; solo puedes quitar una letra si ningún cuadro la usa.',
+      inputSchema: { project, palette: z.record(z.string(), z.object({ color: z.string().describe('#RRGGBB'), name: z.string() })) },
+    },
+    ({ project: id, palette }) => run(id, 'setPalette', { palette }),
+  );
+
+  server.registerTool(
     'undo',
     { description: 'Deshace el último cambio hecho por el agente (no toca lo que dibujó la persona).', inputSchema: { project } },
     ({ project: id }) => guard(async () => text(describe(await canvas.undo(id, { sessionId: AGENT_SESSION })))),
