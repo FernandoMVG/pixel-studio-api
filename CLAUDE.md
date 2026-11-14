@@ -19,3 +19,4 @@ Dominio, HTTP/WebSocket y MCP de Pixel Studio. Reglas generales en `../CLAUDE.md
 - ESM con `"module": "NodeNext"`: los imports relativos llevan extensión `.js` aunque el archivo sea `.ts`.
 - Mensajes de error para el usuario y el agente en español; identificadores en inglés.
 - Coordenadas, filas, columnas e índices de cuadro empiezan en 0.
+- **Windows:** ejecuta Vitest desde una ruta con la unidad en mayúscula (`C:\...`). Si la terminal abre en `c:\...` (pasa en VS Code), Vitest carga sus módulos dos veces y falla con "failed to find the current suite" o "reading 'config'". En PowerShell: `Set-Location 'C:\Users\fmval\Music\pixel-studio\pixel-api'`.
