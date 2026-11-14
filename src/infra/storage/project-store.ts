@@ -1,4 +1,4 @@
-import type { Project } from '../../features/projects/model.js';
+import type { Project } from '../../features/projects/model.ts';
 
 export interface ProjectStore {
   get(id: string): Promise<Project | null>;

@@ -11,8 +11,10 @@ export const DEFAULT_ANIMATION = 'reposo';
 
 /** Error de validación con mensajes listos para el usuario o el agente. */
 export class ValidationError extends Error {
-  constructor(readonly issues: string[]) {
+  readonly issues: string[];
+  constructor(issues: string[]) {
     super(issues.join('\n'));
+    this.issues = issues;
     this.name = 'ValidationError';
   }
 }

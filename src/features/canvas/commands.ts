@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { available, findFrame as locate, parse, rowErrors, TRANSPARENT, ValidationError, type Frame, type Project } from '../projects/model.js';
+import { available, findFrame as locate, parse, rowErrors, TRANSPARENT, ValidationError, type Frame, type Project } from '../projects/model.ts';
 
 export type Change = { x: number; y: number; before: string; after: string };
 export type PixelPatch = { animation: string; frame: number; changes: Change[] };

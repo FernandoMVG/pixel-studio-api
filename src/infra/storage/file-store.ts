@@ -1,12 +1,15 @@
 import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { parseProject, ValidationError, type Project } from '../../features/projects/model.js';
-import type { ProjectStore } from './project-store.js';
+import { parseProject, ValidationError, type Project } from '../../features/projects/model.ts';
+import type { ProjectStore } from './project-store.ts';
 
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 export class FileStore implements ProjectStore {
-  constructor(private readonly dir: string) {}
+  private readonly dir: string;
+  constructor(dir: string) {
+    this.dir = dir;
+  }
 
   private path(id: string): string {
     if (!ID.test(id)) throw new ValidationError([`Id de proyecto no válido: '${id}'`]);

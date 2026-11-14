@@ -1,8 +1,8 @@
 import { inflateSync } from 'node:zlib';
 import { expect, it } from 'vitest';
-import { setRows } from '../canvas/commands.js';
-import { createProject } from '../projects/model.js';
-import { exportSpriteSheetPng } from './png.js';
+import { setRows } from '../canvas/commands.ts';
+import { createProject } from '../projects/model.ts';
+import { exportSpriteSheetPng } from './png.ts';
 
 it('dibuja un personaje y lo exporta a PNG', () => {
   let project = createProject({

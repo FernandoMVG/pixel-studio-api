@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createProject, ValidationError } from '../projects/model.js';
-import { fill, redo, setPixels, setRows, undo } from './commands.js';
+import { createProject, ValidationError } from '../projects/model.ts';
+import { fill, redo, setPixels, setRows, undo } from './commands.ts';
 
 const project = createProject({
   name: 'Bruma',

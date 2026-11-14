@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createProject, parseProject, ValidationError } from './model.js';
+import { createProject, parseProject, ValidationError } from './model.ts';
 
 const palette = {
   K: { color: '#24203F', name: 'Contorno' },

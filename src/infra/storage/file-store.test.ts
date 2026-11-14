@@ -2,8 +2,8 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
-import { createProject, ValidationError } from '../../features/projects/model.js';
-import { FileStore } from './file-store.js';
+import { createProject, ValidationError } from '../../features/projects/model.ts';
+import { FileStore } from './file-store.ts';
 
 it('guarda, lee y lista proyectos de forma atómica y segura', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'pixel-store-'));

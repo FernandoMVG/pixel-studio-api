@@ -1,6 +1,6 @@
 import { crc32, deflateSync } from 'node:zlib';
 import { z } from 'zod';
-import { findAnimation, findFrame, parse, TRANSPARENT, type Frame, type Project } from '../projects/model.js';
+import { findAnimation, findFrame, parse, TRANSPARENT, type Frame, type Project } from '../projects/model.ts';
 
 const Scale = z
   .number('La escala debe ser un entero entre 1 y 16')
