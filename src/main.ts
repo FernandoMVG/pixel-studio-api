@@ -3,17 +3,26 @@ import { serve } from '@hono/node-server';
 import { createAgentServer } from './features/agent/tools.ts';
 import { CanvasService } from './features/canvas/service.ts';
 import { ProjectsService } from './features/projects/service.ts';
+import { SETTINGS_VERSION } from './features/settings/model.ts';
+import { SettingsService } from './features/settings/service.ts';
 import { loadConfig } from './infra/config/config.ts';
 import { createApp } from './infra/http/app.ts';
 import { FileStore } from './infra/storage/file-store.ts';
+import { SettingsFileStore } from './infra/storage/settings-file-store.ts';
 import { WsHub } from './infra/ws/hub.ts';
 
-const { port, projectsDir, agent } = loadConfig();
+const { port, projectsDir, settingsFile, agent } = loadConfig();
 const store = new FileStore(projectsDir);
 const hub = new WsHub();
 const projects = new ProjectsService(store);
 const canvas = new CanvasService(store, hub);
-const app = createApp({ projects, canvas, mcp: () => createAgentServer({ projects, canvas }, agent) });
+const settings = new SettingsService(new SettingsFileStore(settingsFile), { version: SETTINGS_VERSION, agent });
+const app = createApp({
+  projects,
+  canvas,
+  settings,
+  mcp: async () => createAgentServer({ projects, canvas }, (await settings.get()).agent),
+});
 
 const server = serve({ fetch: app.fetch, port, hostname: '127.0.0.1' }) as Server;
 hub.attach(server);

@@ -6,9 +6,9 @@ import type { CanvasService } from '../canvas/service.ts';
 import { exportFramePng } from '../export/png.ts';
 import { findFrame, NotFoundError, TRANSPARENT, ValidationError, type Project } from '../projects/model.ts';
 import type { ProjectsService } from '../projects/service.ts';
+import type { AgentPermissions } from '../settings/model.ts';
 
-/** Lo que el agente puede hacer además de leer y dibujar. Por defecto: todo menos borrar. */
-export type AgentPermissions = { create: boolean; delete: boolean };
+/** Por defecto: todo menos borrar. */
 export const DEFAULT_PERMISSIONS: AgentPermissions = { create: true, delete: false };
 
 /** Sesión de historial del agente. ponytail: una sola para todos los agentes conectados; basta en uso local con un agente. */

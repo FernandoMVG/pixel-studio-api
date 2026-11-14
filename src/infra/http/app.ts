@@ -7,11 +7,19 @@ import { exportRoutes } from '../../features/export/routes.ts';
 import { NotFoundError, ValidationError } from '../../features/projects/model.ts';
 import { projectsRoutes } from '../../features/projects/routes.ts';
 import type { ProjectsService } from '../../features/projects/service.ts';
-
+import { settingsRoutes } from '../../features/settings/routes.ts';
+import type { SettingsService } from '../../features/settings/service.ts';
 import { mcpRoutes } from '../mcp/route.ts';
 import { LOCAL_ORIGIN } from './origin.ts';
 
-export function createApp(deps: { projects: ProjectsService; canvas: CanvasService; mcp: () => McpServer }): Hono {
+export type AppDeps = {
+  projects: ProjectsService;
+  canvas: CanvasService;
+  settings: SettingsService;
+  mcp: () => McpServer | Promise<McpServer>;
+};
+
+export function createApp(deps: AppDeps): Hono {
   const app = new Hono();
   app.use(cors({ origin: (origin) => (LOCAL_ORIGIN.test(origin) ? origin : null) }));
   // Exigir JSON en escrituras obliga al navegador a hacer preflight, así una web cualquiera no puede escribir en la API local (CSRF).
@@ -24,6 +32,7 @@ export function createApp(deps: { projects: ProjectsService; canvas: CanvasServi
   app.route('/projects', projectsRoutes(deps.projects));
   app.route('/projects', canvasRoutes(deps.canvas));
   app.route('/projects', exportRoutes(deps.projects));
+  app.route('/settings', settingsRoutes(deps.settings));
   app.route('/mcp', mcpRoutes(deps.mcp));
 
   app.onError((e, c) => {

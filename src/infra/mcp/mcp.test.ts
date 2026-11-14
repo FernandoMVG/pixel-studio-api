@@ -6,6 +6,7 @@ import { serve } from '@hono/node-server';
 import { expect, test } from 'vitest';
 import { WebSocket } from 'ws';
 import { createAgentServer } from '../../features/agent/tools.ts';
+import { memorySettings } from '../../features/settings/testing.ts';
 import { CanvasService } from '../../features/canvas/service.ts';
 import { ProjectsService } from '../../features/projects/service.ts';
 import { createApp } from '../http/app.ts';
@@ -39,7 +40,7 @@ test('un agente MCP dibuja un sprite completo y se autocorrige ante un error de 
   const hub = new WsHub();
   const projects = new ProjectsService(store);
   const canvas = new CanvasService(store, hub);
-  const app = createApp({ projects, canvas, mcp: () => createAgentServer({ projects, canvas }) });
+  const app = createApp({ projects, canvas, settings: memorySettings(), mcp: () => createAgentServer({ projects, canvas }) });
   const server = serve({ fetch: app.fetch, port: 0, hostname: '127.0.0.1' });
   let client: Client | undefined;
   let ws: WebSocket | undefined;

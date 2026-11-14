@@ -7,7 +7,7 @@ const LOCAL_HOST = /^(127\.0\.0\.1|localhost)(:\d+)?$/;
 const noSessions = { errors: ['Este servidor MCP no usa sesiones: solo acepta POST'] };
 
 /** MCP sin sesión: cada POST crea su servidor y transporte. Protege contra DNS rebinding comprobando host y origen. */
-export function mcpRoutes(createServer: () => McpServer): Hono {
+export function mcpRoutes(createServer: () => McpServer | Promise<McpServer>): Hono {
   const app = new Hono();
   app.use(async (c, next) => {
     if (!LOCAL_HOST.test(c.req.header('host') ?? '')) return c.json({ errors: ['Host no permitido'] }, 403);
@@ -16,7 +16,7 @@ export function mcpRoutes(createServer: () => McpServer): Hono {
     await next();
   });
   app.post('/', async (c) => {
-    const server = createServer();
+    const server = await createServer(); // con los permisos vigentes en cada petición
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     await server.connect(transport);
     return transport.handleRequest(c.req.raw);

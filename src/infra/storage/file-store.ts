@@ -1,7 +1,8 @@
-import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseProject, ValidationError, type Project } from '../../features/projects/model.ts';
 import type { ProjectStore } from '../../features/projects/store.ts';
+import { writeJsonAtomic } from './atomic.ts';
 
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -18,11 +19,7 @@ export class FileStore implements ProjectStore {
 
   async save(project: Project): Promise<void> {
     const valid = parseProject(project);
-    const file = this.path(valid.id);
-    await mkdir(this.dir, { recursive: true });
-    const tmp = `${file}.tmp`;
-    await writeFile(tmp, `${JSON.stringify(valid, null, 2)}\n`, 'utf8');
-    await rename(tmp, file);
+    await writeJsonAtomic(this.path(valid.id), valid);
   }
 
   async get(id: string): Promise<Project | null> {

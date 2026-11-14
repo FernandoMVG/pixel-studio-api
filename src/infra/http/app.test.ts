@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { createAgentServer } from '../../features/agent/tools.ts';
+import { memorySettings } from '../../features/settings/testing.ts';
 import { CanvasService } from '../../features/canvas/service.ts';
 import { ProjectsService } from '../../features/projects/service.ts';
 import { MemoryStore } from '../storage/memory-store.ts';
@@ -8,7 +9,7 @@ import { createApp } from './app.ts';
 const store = new MemoryStore();
 const projects = new ProjectsService(store);
 const canvas = new CanvasService(store, { publish() {} });
-const app = createApp({ projects, canvas, mcp: () => createAgentServer({ projects, canvas }) });
+const app = createApp({ projects, canvas, settings: memorySettings(), mcp: () => createAgentServer({ projects, canvas }) });
 const json = (body: unknown) => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 const cmd = (command: object) => json({ sessionId: 'web', commands: [{ animation: 'reposo', frame: 0, ...command }] });
 
@@ -43,4 +44,10 @@ test('flujo HTTP: crear, errores, parches, exportar', async () => {
   // CSRF: un formulario o fetch "simple" (text/plain) desde otra web no puede escribir.
   const csrf = await app.request('/projects/bruma/commands', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' });
   expect(csrf.status).toBe(415);
+
+  // Permisos del agente editables desde la app.
+  const put = (body: unknown) => app.request('/settings/agent', { ...json(body), method: 'PUT' });
+  const updated = await put({ delete: true });
+  expect(((await updated.json()) as { agent: { create: boolean; delete: boolean } }).agent).toEqual({ create: true, delete: true });
+  expect((await put({ borrar: true })).status).toBe(400);
 });
