@@ -1,11 +1,14 @@
 import { expect, test } from 'vitest';
+import { createAgentServer } from '../../features/agent/tools.ts';
 import { CanvasService } from '../../features/canvas/service.ts';
 import { ProjectsService } from '../../features/projects/service.ts';
 import { MemoryStore } from '../storage/memory-store.ts';
 import { createApp } from './app.ts';
 
 const store = new MemoryStore();
-const app = createApp({ projects: new ProjectsService(store), canvas: new CanvasService(store, { publish() {} }) });
+const projects = new ProjectsService(store);
+const canvas = new CanvasService(store, { publish() {} });
+const app = createApp({ projects, canvas, mcp: () => createAgentServer({ projects, canvas }) });
 const json = (body: unknown) => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 const cmd = (command: object) => json({ sessionId: 'web', commands: [{ animation: 'reposo', frame: 0, ...command }] });
 

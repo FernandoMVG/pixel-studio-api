@@ -2,6 +2,7 @@ import type { AddressInfo } from 'node:net';
 import { serve } from '@hono/node-server';
 import { expect, test } from 'vitest';
 import { WebSocket } from 'ws';
+import { createAgentServer } from '../../features/agent/tools.ts';
 import { CanvasService } from '../../features/canvas/service.ts';
 import { ProjectsService } from '../../features/projects/service.ts';
 import { createApp } from '../http/app.ts';
@@ -15,7 +16,9 @@ const json = (body: unknown) => ({ method: 'POST', headers: { 'content-type': 'a
 test('un cliente aplica un lote por HTTP y otro conectado por WebSocket recibe el parche', async () => {
   const store = new MemoryStore();
   const hub = new WsHub();
-  const app = createApp({ projects: new ProjectsService(store), canvas: new CanvasService(store, hub) });
+  const projects = new ProjectsService(store);
+  const canvas = new CanvasService(store, hub);
+  const app = createApp({ projects, canvas, mcp: () => createAgentServer({ projects, canvas }) });
   const server = serve({ fetch: app.fetch, port: 0, hostname: '127.0.0.1' });
   const sockets: WebSocket[] = [];
   try {
