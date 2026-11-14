@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import { ANIMATION_COMMANDS, applyAnimationPatch, invertAnimationPatch, type AnimationPatch } from '../animations/commands.ts';
+import { applyPalettePatch, invertPalettePatch, setPalette, type PalettePatch } from '../palette/commands.ts';
 import { available, findFrame as locate, parse, rowErrors, TRANSPARENT, ValidationError, type Frame, type Project } from '../projects/model.ts';
 
 export type Change = { x: number; y: number; before: string; after: string };
 export type PixelPatch = { kind: 'pixels'; animation: string; frame: number; changes: Change[] };
 /** Cualquier parche que guarda el historial y reciben los clientes. */
-export type Patch = PixelPatch | AnimationPatch;
+export type Patch = PixelPatch | AnimationPatch | PalettePatch;
 export type CommandResult = { project: Project; patch: PixelPatch };
 
 const Target = {
@@ -91,20 +92,22 @@ export function fill(project: Project, input: z.input<typeof FillInput>): Comman
 /** Aplica un parche (lado `after`). Es lo mismo que hacen los clientes al recibirlo. */
 export function applyPatch(project: Project, patch: Patch): Project {
   if (patch.kind === 'animation') return applyAnimationPatch(project, patch);
+  if (patch.kind === 'palette') return applyPalettePatch(project, patch);
   const next = [...locate(project, patch.animation, patch.frame).rows];
   for (const c of patch.changes) next[c.y] = setChar(next[c.y]!, c.x, c.after);
   return commit(project, patch.animation, patch.frame, next).project;
 }
 
 /** El parche que deshace a `patch`: intercambia antes y después, en orden inverso. */
-export const invert = (patch: Patch): Patch =>
-  patch.kind === 'animation'
-    ? invertAnimationPatch(patch)
-    : { ...patch, changes: [...patch.changes].reverse().map((c) => ({ ...c, before: c.after, after: c.before })) };
+export function invert(patch: Patch): Patch {
+  if (patch.kind === 'animation') return invertAnimationPatch(patch);
+  if (patch.kind === 'palette') return invertPalettePatch(patch);
+  return { ...patch, changes: [...patch.changes].reverse().map((c) => ({ ...c, before: c.after, after: c.before })) };
+}
 
 export const undo = (project: Project, patch: Patch) => applyPatch(project, invert(patch));
 export const redo = applyPatch;
 
 /** Todos los comandos que escriben el proyecto, por nombre, para lotes que llegan por HTTP o MCP. */
-export const COMMANDS = { setPixels, setRows, fill, ...ANIMATION_COMMANDS } as const;
+export const COMMANDS = { setPixels, setRows, fill, setPalette, ...ANIMATION_COMMANDS } as const;
 export type CommandName = keyof typeof COMMANDS;

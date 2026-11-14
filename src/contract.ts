@@ -9,6 +9,7 @@ import type { COMMANDS } from './features/canvas/commands.ts';
 export type { Animation, Frame, Palette, Project } from './features/projects/model.ts';
 export type { Change, Patch, PixelPatch } from './features/canvas/commands.ts';
 export type { AnimationPatch } from './features/animations/commands.ts';
+export type { PalettePatch } from './features/palette/commands.ts';
 export type { AgentPermissions, Settings } from './features/settings/model.ts';
 export type { CanvasEvent };
 

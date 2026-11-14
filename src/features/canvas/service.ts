@@ -36,7 +36,7 @@ export class CanvasService {
         try {
           const r = run(project, args);
           project = r.project;
-          if (r.patch.kind === 'animation' || r.patch.changes.length) patches.push(r.patch);
+          if (r.patch.kind !== 'pixels' || r.patch.changes.length) patches.push(r.patch);
         } catch (e) {
           if (e instanceof ValidationError) throw new ValidationError(e.issues.map((m) => `Comando ${i} (${type}): ${m}`));
           throw e;

@@ -51,7 +51,7 @@ function summary(p: Project): string {
 function describe(patches: Patch[]): string {
   if (!patches.length) return 'Sin cambios.';
   const pixels = patches.reduce((n, p) => n + (p.kind === 'pixels' ? p.changes.length : 0), 0);
-  const structure = patches.filter((p) => p.kind === 'animation').length;
+  const structure = patches.filter((p) => p.kind !== 'pixels').length;
   return [pixels && `${pixels} píxeles cambiados`, structure && `${structure} cambios de estructura`].filter(Boolean).join(', ') + '.';
 }
 

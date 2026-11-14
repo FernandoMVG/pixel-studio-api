@@ -33,7 +33,7 @@ it('aplica lotes atómicos, deshace por sesión (píxeles y estructura) y public
   await canvas.redo('bruma', { sessionId: 'web' });
   expect(await pixel(0, 0)).toBe('K');
 
-  const after = (e: CanvasEvent) => { const p = e.patches[0]!; return p.kind === 'pixels' ? p.changes[0]!.after : `+${p.after?.frames.length}`; };
+  const after = (e: CanvasEvent) => { const p = e.patches[0]!; return p.kind === 'pixels' ? p.changes[0]!.after : p.kind; };
   expect(events.map((e) => `${e.sessionId}:${after(e)}`)).toEqual(['web:K', 'agente:P', 'web:.', 'web:K']);
 
   // Estructura y píxeles en el mismo lote: se deshacen juntos.
@@ -43,4 +43,15 @@ it('aplica lotes atómicos, deshace por sesión (píxeles y estructura) y public
   expect((await projects.get('bruma')).animations[0]!.frames).toHaveLength(1);
   await canvas.redo('bruma', { sessionId: 'web' });
   expect((await projects.get('bruma')).animations[0]!.frames[1]![3]![3]).toBe('W');
+
+  // Paleta: no se puede quitar una letra en uso; un cambio de color se deshace.
+  const palette = (await projects.get('bruma')).palette;
+  const { K: _k, ...withoutK } = palette;
+  await expect(canvas.apply('bruma', { sessionId: 'web', commands: [{ type: 'setPalette', palette: { ...withoutK, G: { color: '#00AA00', name: 'Verde' } } }] })).rejects.toThrow(
+    /La letra 'K' se usa en \d+ píxeles/,
+  );
+  await canvas.apply('bruma', { sessionId: 'web', commands: [{ type: 'setPalette', palette: { ...palette, P: { color: '#112233', name: 'Cuerpo' } } }] });
+  expect((await projects.get('bruma')).palette.P!.color).toBe('#112233');
+  await canvas.undo('bruma', { sessionId: 'web' });
+  expect((await projects.get('bruma')).palette.P!.color).toBe('#8C7CF2');
 });
