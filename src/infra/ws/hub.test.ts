@@ -2,6 +2,7 @@ import type { AddressInfo } from 'node:net';
 import { serve } from '@hono/node-server';
 import { expect, test } from 'vitest';
 import { WebSocket } from 'ws';
+import { ActivityLog } from '../../features/agent/activity.ts';
 import { createAgentServer } from '../../features/agent/tools.ts';
 import { memorySettings } from '../../features/settings/testing.ts';
 import { CanvasService } from '../../features/canvas/service.ts';
@@ -19,7 +20,7 @@ test('un cliente aplica un lote por HTTP y otro conectado por WebSocket recibe e
   const hub = new WsHub();
   const projects = new ProjectsService(store);
   const canvas = new CanvasService(store, hub);
-  const app = createApp({ projects, canvas, settings: memorySettings(), mcp: () => createAgentServer({ projects, canvas }) });
+  const app = createApp({ projects, canvas, settings: memorySettings(), activity: new ActivityLog(), mcp: () => createAgentServer({ projects, canvas }) });
   const server = serve({ fetch: app.fetch, port: 0, hostname: '127.0.0.1' });
   const sockets: WebSocket[] = [];
   try {

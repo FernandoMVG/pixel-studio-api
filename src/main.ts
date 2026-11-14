@@ -1,5 +1,6 @@
 import type { Server } from 'node:http';
 import { serve } from '@hono/node-server';
+import { ActivityLog } from './features/agent/activity.ts';
 import { createAgentServer } from './features/agent/tools.ts';
 import { CanvasService } from './features/canvas/service.ts';
 import { ProjectsService } from './features/projects/service.ts';
@@ -16,12 +17,14 @@ const store = new FileStore(projectsDir);
 const hub = new WsHub();
 const projects = new ProjectsService(store);
 const canvas = new CanvasService(store, hub);
+const activity = new ActivityLog();
 const settings = new SettingsService(new SettingsFileStore(settingsFile), { version: SETTINGS_VERSION, agent });
 const app = createApp({
   projects,
   canvas,
   settings,
-  mcp: async () => createAgentServer({ projects, canvas }, (await settings.get()).agent),
+  activity,
+  mcp: async () => createAgentServer({ projects, canvas, activity }, (await settings.get()).agent),
 });
 
 const server = serve({ fetch: app.fetch, port, hostname: '127.0.0.1' }) as Server;

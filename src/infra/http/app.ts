@@ -9,6 +9,8 @@ import { projectsRoutes } from '../../features/projects/routes.ts';
 import type { ProjectsService } from '../../features/projects/service.ts';
 import { settingsRoutes } from '../../features/settings/routes.ts';
 import type { SettingsService } from '../../features/settings/service.ts';
+import type { ActivityLog } from '../../features/agent/activity.ts';
+import { agentRoutes } from '../../features/agent/routes.ts';
 import { mcpRoutes } from '../mcp/route.ts';
 import { LOCAL_ORIGIN } from './origin.ts';
 
@@ -16,6 +18,7 @@ export type AppDeps = {
   projects: ProjectsService;
   canvas: CanvasService;
   settings: SettingsService;
+  activity: ActivityLog;
   mcp: () => McpServer | Promise<McpServer>;
 };
 
@@ -33,6 +36,7 @@ export function createApp(deps: AppDeps): Hono {
   app.route('/projects', canvasRoutes(deps.canvas));
   app.route('/projects', exportRoutes(deps.projects));
   app.route('/settings', settingsRoutes(deps.settings));
+  app.route('/agent', agentRoutes(deps.activity));
   app.route('/mcp', mcpRoutes(deps.mcp));
 
   app.onError((e, c) => {

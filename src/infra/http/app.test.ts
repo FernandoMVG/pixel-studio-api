@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { ActivityLog } from '../../features/agent/activity.ts';
 import { createAgentServer } from '../../features/agent/tools.ts';
 import { memorySettings } from '../../features/settings/testing.ts';
 import { CanvasService } from '../../features/canvas/service.ts';
@@ -9,7 +10,7 @@ import { createApp } from './app.ts';
 const store = new MemoryStore();
 const projects = new ProjectsService(store);
 const canvas = new CanvasService(store, { publish() {} });
-const app = createApp({ projects, canvas, settings: memorySettings(), mcp: () => createAgentServer({ projects, canvas }) });
+const app = createApp({ projects, canvas, settings: memorySettings(), activity: new ActivityLog(), mcp: () => createAgentServer({ projects, canvas }) });
 const json = (body: unknown) => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 const cmd = (command: object) => json({ sessionId: 'web', commands: [{ animation: 'reposo', frame: 0, ...command }] });
 

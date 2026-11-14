@@ -5,6 +5,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { serve } from '@hono/node-server';
 import { expect, test } from 'vitest';
 import { WebSocket } from 'ws';
+import { ActivityLog } from '../../features/agent/activity.ts';
 import { createAgentServer } from '../../features/agent/tools.ts';
 import { memorySettings } from '../../features/settings/testing.ts';
 import { CanvasService } from '../../features/canvas/service.ts';
@@ -40,7 +41,8 @@ test('un agente MCP dibuja un sprite completo y se autocorrige ante un error de 
   const hub = new WsHub();
   const projects = new ProjectsService(store);
   const canvas = new CanvasService(store, hub);
-  const app = createApp({ projects, canvas, settings: memorySettings(), mcp: () => createAgentServer({ projects, canvas }) });
+  const activity = new ActivityLog();
+  const app = createApp({ projects, canvas, settings: memorySettings(), activity, mcp: () => createAgentServer({ projects, canvas, activity }) });
   const server = serve({ fetch: app.fetch, port: 0, hostname: '127.0.0.1' });
   let client: Client | undefined;
   let ws: WebSocket | undefined;
@@ -71,6 +73,10 @@ test('un agente MCP dibuja un sprite completo y se autocorrige ante un error de 
     const good = await call('set_rows', { project: 'gato', animation: 'reposo', frame: 0, startRow: 0, rows: CAT });
     expect(good.isError).toBeFalsy();
     expect(good.content[0]?.text).toContain(CAT[1]!);
+    // La pantalla Agente muestra el error y la autocorrección.
+    const [fixed, failed] = activity.list().entries;
+    expect(failed).toMatchObject({ tool: 'set_rows', ok: false });
+    expect(fixed).toMatchObject({ tool: 'set_rows', ok: true, fixed: true });
 
     const msg = await within(received, 'mensaje');
     expect(msg.type).toBe('patches');

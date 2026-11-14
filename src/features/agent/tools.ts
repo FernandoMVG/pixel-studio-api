@@ -7,6 +7,7 @@ import { exportFramePng } from '../export/png.ts';
 import { findFrame, NotFoundError, TRANSPARENT, ValidationError, type Project } from '../projects/model.ts';
 import type { ProjectsService } from '../projects/service.ts';
 import type { AgentPermissions } from '../settings/model.ts';
+import type { ActivityLog } from './activity.ts';
 
 /** Por defecto: todo menos borrar. */
 export const DEFAULT_PERMISSIONS: AgentPermissions = { create: true, delete: false };
@@ -14,7 +15,7 @@ export const DEFAULT_PERMISSIONS: AgentPermissions = { create: true, delete: fal
 /** Sesión de historial del agente. ponytail: una sola para todos los agentes conectados; basta en uso local con un agente. */
 export const AGENT_SESSION = 'agente';
 
-type Deps = { projects: ProjectsService; canvas: CanvasService };
+type Deps = { projects: ProjectsService; canvas: CanvasService; activity?: ActivityLog };
 
 const text = (t: string): CallToolResult => ({ content: [{ type: 'text', text: t }] });
 
@@ -60,8 +61,22 @@ const animation = z.string().describe("Nombre de la animación, p. ej. 'reposo'"
 const frame = z.number().int().describe('Índice del cuadro, empieza en 0');
 const color = z.string().describe("Una letra de la paleta, o '.' para transparente");
 
-export function createAgentServer({ projects, canvas }: Deps, perms: AgentPermissions = DEFAULT_PERMISSIONS): McpServer {
+export function createAgentServer({ projects, canvas, activity }: Deps, perms: AgentPermissions = DEFAULT_PERMISSIONS): McpServer {
   const server = new McpServer({ name: 'pixel-studio', version: '0.1.0' });
+
+  /**
+   * Igual que `server.registerTool`, pero anota cada llamada y su resultado en el registro de actividad.
+   * Sin `inputSchema`, el SDK llama al callback solo con `extra`, así que los argumentos son `{}`.
+   * `any`: envoltorio genérico sobre las sobrecargas del SDK; los tipos de cada herramienta los da `typeof server.registerTool`.
+   */
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const tool = ((name: string, config: any, cb: any) =>
+    server.registerTool(name, config, (async (...call: any[]) => {
+      const result = await cb(...call);
+      activity?.record(name, config.inputSchema ? call[0] : {}, result);
+      return result;
+    }) as any)) as typeof server.registerTool;
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 
   /** Ejecuta un comando como lote de uno en la sesión del agente; responde con el resumen y el cuadro resultante. */
   const run = (id: string, type: string, args: Record<string, unknown>, show?: { animation: string; frame: number }) =>
@@ -75,19 +90,19 @@ export function createAgentServer({ projects, canvas }: Deps, perms: AgentPermis
       return text(describe(patches) + after);
     });
 
-  server.registerTool(
+  tool(
     'list_projects',
     { description: 'Lista los proyectos con su tamaño, animaciones y paleta.', annotations: { readOnlyHint: true } },
     () => guard(async () => text((await projects.list()).map(summary).join('\n') || 'No hay proyectos todavía.')),
   );
 
-  server.registerTool(
+  tool(
     'get_project',
     { description: 'Tamaño, paleta (letra, nombre y color) y animaciones de un proyecto.', inputSchema: { project }, annotations: { readOnlyHint: true } },
     ({ project: id }) => guard(async () => text(summary(await projects.get(id)))),
   );
 
-  server.registerTool(
+  tool(
     'get_frame',
     {
       description:
@@ -98,7 +113,7 @@ export function createAgentServer({ projects, canvas }: Deps, perms: AgentPermis
     ({ project: id, animation: a, frame: f }) => guard(async () => text(frameText(await projects.get(id), a, f))),
   );
 
-  server.registerTool(
+  tool(
     'set_rows',
     {
       description:
@@ -108,7 +123,7 @@ export function createAgentServer({ projects, canvas }: Deps, perms: AgentPermis
     ({ project: id, ...args }) => run(id, 'setRows', args, args),
   );
 
-  server.registerTool(
+  tool(
     'set_pixels',
     {
       description: 'Pinta píxeles sueltos. x es la columna e y la fila, ambas desde 0. Devuelve el cuadro resultante.',
@@ -117,7 +132,7 @@ export function createAgentServer({ projects, canvas }: Deps, perms: AgentPermis
     ({ project: id, ...args }) => run(id, 'setPixels', args, args),
   );
 
-  server.registerTool(
+  tool(
     'fill',
     {
       description: 'Rellena desde (x, y) todos los píxeles contiguos del mismo color (4 vecinos), como el bote de pintura. Devuelve el cuadro resultante.',
@@ -126,7 +141,7 @@ export function createAgentServer({ projects, canvas }: Deps, perms: AgentPermis
     ({ project: id, ...args }) => run(id, 'fill', args, args),
   );
 
-  server.registerTool(
+  tool(
     'add_frame',
     {
       description: 'Añade un cuadro vacío, o una copia de copyOf, en la posición at (por defecto al final). Para animar, copia el cuadro anterior y modifícalo.',
@@ -135,31 +150,31 @@ export function createAgentServer({ projects, canvas }: Deps, perms: AgentPermis
     ({ project: id, ...args }) => run(id, 'addFrame', args),
   );
 
-  server.registerTool(
+  tool(
     'delete_frame',
     { description: 'Borra un cuadro. La animación debe conservar al menos uno. Se puede deshacer con undo.', inputSchema: { project, animation, frame } },
     ({ project: id, ...args }) => run(id, 'deleteFrame', args),
   );
 
-  server.registerTool(
+  tool(
     'set_fps',
     { description: 'Cambia la velocidad de una animación, de 1 a 24 cuadros por segundo.', inputSchema: { project, animation, fps: z.number().int() } },
     ({ project: id, ...args }) => run(id, 'setFps', args),
   );
 
-  server.registerTool(
+  tool(
     'add_animation',
     { description: "Crea una animación nueva con un cuadro vacío, p. ej. 'caminar'.", inputSchema: { project, name: z.string(), fps: z.number().int().optional() } },
     ({ project: id, ...args }) => run(id, 'addAnimation', args),
   );
 
-  server.registerTool(
+  tool(
     'rename_animation',
     { description: 'Cambia el nombre de una animación.', inputSchema: { project, animation, name: z.string() } },
     ({ project: id, ...args }) => run(id, 'renameAnimation', args),
   );
 
-  server.registerTool(
+  tool(
     'set_palette',
     {
       description:
@@ -169,19 +184,19 @@ export function createAgentServer({ projects, canvas }: Deps, perms: AgentPermis
     ({ project: id, palette }) => run(id, 'setPalette', { palette }),
   );
 
-  server.registerTool(
+  tool(
     'undo',
     { description: 'Deshace el último cambio hecho por el agente (no toca lo que dibujó la persona).', inputSchema: { project } },
     ({ project: id }) => guard(async () => text(describe(await canvas.undo(id, { sessionId: AGENT_SESSION })))),
   );
 
-  server.registerTool(
+  tool(
     'redo',
     { description: 'Rehace el último cambio deshecho por el agente.', inputSchema: { project } },
     ({ project: id }) => guard(async () => text(describe(await canvas.redo(id, { sessionId: AGENT_SESSION })))),
   );
 
-  server.registerTool(
+  tool(
     'export_png',
     {
       description: 'Devuelve la imagen PNG de un cuadro para que la veas y revises el dibujo. scale de 1 a 16 (por defecto 8).',
@@ -196,7 +211,7 @@ export function createAgentServer({ projects, canvas }: Deps, perms: AgentPermis
   );
 
   if (perms.create)
-    server.registerTool(
+    tool(
       'create_project',
       {
         description:
@@ -212,12 +227,12 @@ export function createAgentServer({ projects, canvas }: Deps, perms: AgentPermis
     );
 
   if (perms.delete) {
-    server.registerTool(
+    tool(
       'delete_animation',
       { description: 'Borra una animación entera. Se puede deshacer con undo.', inputSchema: { project, animation }, annotations: { destructiveHint: true } },
       ({ project: id, ...args }) => run(id, 'deleteAnimation', args),
     );
-    server.registerTool(
+    tool(
       'delete_project',
       { description: 'Borra un proyecto y su archivo. NO se puede deshacer.', inputSchema: { project }, annotations: { destructiveHint: true } },
       ({ project: id }) => guard(async () => (await projects.remove(id), text(`Proyecto '${id}' borrado.`))),
