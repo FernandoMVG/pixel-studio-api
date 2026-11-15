@@ -18,7 +18,7 @@ const json = (body: unknown) => ({ method: 'POST', headers: { 'content-type': 'a
 test('un cliente aplica un lote por HTTP y otro conectado por WebSocket recibe el parche', async () => {
   const store = new MemoryStore();
   const hub = new WsHub();
-  const projects = new ProjectsService(store);
+  const projects = new ProjectsService(store, hub);
   const canvas = new CanvasService(store, hub);
   const app = createApp({ projects, canvas, settings: memorySettings(), activity: new ActivityLog(), mcp: () => createAgentServer({ projects, canvas }) });
   const server = serve({ fetch: app.fetch, port: 0, hostname: '127.0.0.1' });
@@ -55,6 +55,14 @@ test('un cliente aplica un lote por HTTP y otro conectado por WebSocket recibe e
     sockets.push(evil);
     const code = await within(new Promise<number>((r) => evil.once('close', r)), 'cierre evil');
     expect(code).toBe(1008);
+
+    // La galería escucha `*`: se entera de los proyectos nuevos (p. ej. los que crea el agente).
+    const all = new WebSocket(`ws://${base}/ws?project=*`, { headers: { origin: 'http://localhost:5173' } });
+    sockets.push(all);
+    const created = new Promise<string>((r) => all.once('message', (d) => r(d.toString())));
+    await within(new Promise((r) => all.once('open', r)), 'open *');
+    await fetch(`http://${base}/projects`, json({ name: 'Niebla', palette }));
+    expect(JSON.parse(await within(created, 'alta'))).toEqual({ type: 'projects', projectId: 'niebla', change: 'created' });
   } finally {
     for (const s of sockets) s.terminate();
     await hub.close();

@@ -1,12 +1,15 @@
 import type { Server } from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 import type { CanvasEvent, PatchPublisher } from '../../features/canvas/publisher.ts';
-
+import type { ProjectsEvent, ProjectsPublisher } from '../../features/projects/publisher.ts';
 import { LOCAL_ORIGIN } from '../http/origin.ts';
 
 // Los WebSocket no tienen CORS: se valida el origen a mano (misma regla que la API HTTP).
+// `?project=<id>` recibe los parches de ese proyecto; `?project=*` recibe los de todos y las altas y bajas.
 
-export class WsHub implements PatchPublisher {
+const ALL = '*';
+
+export class WsHub implements PatchPublisher, ProjectsPublisher {
   #wss?: WebSocketServer;
   #subs = new Map<string, Set<WebSocket>>();
 
@@ -28,9 +31,19 @@ export class WsHub implements PatchPublisher {
   }
 
   publish(event: CanvasEvent): void {
-    const message = JSON.stringify({ type: 'patches', ...event });
-    for (const socket of this.#subs.get(event.projectId) ?? []) {
-      if (socket.readyState === WebSocket.OPEN) socket.send(message);
+    this.#send([event.projectId, ALL], { type: 'patches', ...event });
+  }
+
+  publishProjects(event: ProjectsEvent): void {
+    this.#send([ALL], { type: 'projects', ...event });
+  }
+
+  #send(channels: string[], data: object): void {
+    const message = JSON.stringify(data);
+    for (const channel of channels) {
+      for (const socket of this.#subs.get(channel) ?? []) {
+        if (socket.readyState === WebSocket.OPEN) socket.send(message);
+      }
     }
   }
 

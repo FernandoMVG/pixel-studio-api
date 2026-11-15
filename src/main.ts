@@ -15,7 +15,7 @@ import { WsHub } from './infra/ws/hub.ts';
 const { port, projectsDir, settingsFile, agent } = loadConfig();
 const store = new FileStore(projectsDir);
 const hub = new WsHub();
-const projects = new ProjectsService(store);
+const projects = new ProjectsService(store, hub);
 const canvas = new CanvasService(store, hub);
 const activity = new ActivityLog();
 const settings = new SettingsService(new SettingsFileStore(settingsFile), { version: SETTINGS_VERSION, agent });
