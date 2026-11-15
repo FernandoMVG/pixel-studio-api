@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { blankFrame, findAnimation, FPS, parse, ValidationError, type Animation, type Project } from '../projects/model.ts';
+import { blankFrame, findAnimation, FPS, Hold, parse, ValidationError, type Animation, type Project } from '../projects/model.ts';
 
 /** Cambio de estructura: la animación en `index` antes y después. `null` = no existe (alta o baja). */
 export type AnimationPatch = { kind: 'animation'; index: number; before: Animation | null; after: Animation | null };
@@ -50,6 +50,7 @@ export function addFrame(project: Project, input: z.input<typeof AddFrameInput>)
       throw new ValidationError([`Cuadro ${copyOf} no existe en '${animation}': tiene ${n} cuadros (0 a ${n - 1})`]);
     const frame = copyOf === undefined ? blankFrame(project.width, project.height) : [...a.frames[copyOf]!];
     a.frames.splice(at ?? n, 0, frame);
+    a.holds.splice(at ?? n, 0, copyOf === undefined ? 1 : a.holds[copyOf]!);
   });
 }
 
@@ -61,6 +62,18 @@ export function deleteFrame(project: Project, input: z.input<typeof DeleteFrameI
     if (frame >= a.frames.length) throw new ValidationError([`Cuadro ${frame} no existe en '${animation}': tiene ${a.frames.length} cuadros (0 a ${a.frames.length - 1})`]);
     if (a.frames.length === 1) throw new ValidationError([`No se puede borrar el único cuadro de '${animation}'`]);
     a.frames.splice(frame, 1);
+    a.holds.splice(frame, 1);
+  });
+}
+
+const SetHoldInput = z.object({ animation: AnimationName, frame: FrameIndex, hold: Hold });
+
+/** Cuántos tics dura un cuadro: 1 normal, 3 el triple. Evita repetir cuadros para hacer pausas. */
+export function setHold(project: Project, input: z.input<typeof SetHoldInput>): AnimationResult {
+  const { animation, frame, hold } = parse(SetHoldInput, input);
+  return editAnimation(project, animation, (a) => {
+    if (frame >= a.frames.length) throw new ValidationError([`Cuadro ${frame} no existe en '${animation}': tiene ${a.frames.length} cuadros (0 a ${a.frames.length - 1})`]);
+    a.holds[frame] = hold;
   });
 }
 
@@ -79,7 +92,7 @@ const AddAnimationInput = z.object({ name: AnimationName, fps: Fps.default(FPS.d
 export function addAnimation(project: Project, input: z.input<typeof AddAnimationInput>): AnimationResult {
   const { name, fps } = parse(AddAnimationInput, input);
   nameTaken(project, name);
-  return result(project, project.animations.length, null, { name, fps, frames: [blankFrame(project.width, project.height)] });
+  return result(project, project.animations.length, null, { name, fps, frames: [blankFrame(project.width, project.height)], holds: [1] });
 }
 
 const RenameAnimationInput = z.object({ animation: AnimationName, name: AnimationName });
@@ -101,4 +114,4 @@ export function deleteAnimation(project: Project, input: z.input<typeof DeleteAn
   return result(project, i, project.animations[i]!, null);
 }
 
-export const ANIMATION_COMMANDS = { addFrame, deleteFrame, setFps, addAnimation, renameAnimation, deleteAnimation } as const;
+export const ANIMATION_COMMANDS = { addFrame, deleteFrame, setHold, setFps, addAnimation, renameAnimation, deleteAnimation } as const;

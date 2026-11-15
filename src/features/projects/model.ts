@@ -7,6 +7,8 @@ export const TRANSPARENT = '.';
 export const SIDE = { min: 8, max: 32, default: 16 } as const;
 export const COLORS = { min: 4, max: 6 } as const;
 export const FPS = { min: 1, max: 24, default: 6 } as const;
+/** Duración de un cuadro en tics de su animación (1 tic = 1/fps s). */
+export const HOLD = { min: 1, max: 60 } as const;
 export const DEFAULT_ANIMATION = 'reposo';
 
 /** Error de validación con mensajes listos para el usuario o el agente. */
@@ -64,11 +66,21 @@ export const PaletteSchema = z.record(PaletteKey, PaletteEntry).superRefine((p, 
     ctx.addIssue({ code: 'custom', message: `La paleta tiene ${n} colores; debe tener entre ${COLORS.min} y ${COLORS.max}` });
 });
 
-const AnimationSchema = z.object({
-  name: Name,
-  fps: z.number().int().min(FPS.min).max(FPS.max),
-  frames: z.array(z.array(z.string())).min(1, 'La animación necesita al menos un cuadro'),
-});
+export const Hold = z
+  .number()
+  .int('La duración debe ser un número entero de tics')
+  .min(HOLD.min, `La duración de un cuadro va de ${HOLD.min} a ${HOLD.max} tics`)
+  .max(HOLD.max, `La duración de un cuadro va de ${HOLD.min} a ${HOLD.max} tics`);
+
+// `holds` es opcional al leer (proyectos anteriores): si falta, cada cuadro dura 1 tic.
+const AnimationSchema = z
+  .object({
+    name: Name,
+    fps: z.number().int().min(FPS.min).max(FPS.max),
+    frames: z.array(z.array(z.string())).min(1, 'La animación necesita al menos un cuadro'),
+    holds: z.array(Hold).optional(),
+  })
+  .transform((a) => ({ ...a, holds: a.holds ?? a.frames.map(() => 1) }));
 
 export type Palette = z.infer<typeof PaletteSchema>;
 export type Frame = string[];
@@ -103,6 +115,8 @@ export const ProjectSchema = z
     for (const a of p.animations) {
       if (seen.has(a.name)) ctx.addIssue({ code: 'custom', message: `Hay dos animaciones llamadas '${a.name}'` });
       seen.add(a.name);
+      if (a.holds.length !== a.frames.length)
+        ctx.addIssue({ code: 'custom', message: `Animación '${a.name}': hay ${a.holds.length} duraciones para ${a.frames.length} cuadros` });
       a.frames.forEach((f, i) =>
         rowErrors(f, p.width, p.height, p.palette, `Animación '${a.name}', cuadro ${i}: `).forEach((message) =>
           ctx.addIssue({ code: 'custom', message }),
@@ -161,7 +175,7 @@ export function createProject(input: z.input<typeof CreateProjectInput>): Projec
     width,
     height,
     palette,
-    animations: [{ name: DEFAULT_ANIMATION, fps: FPS.default, frames: [blankFrame(width, height)] }],
+    animations: [{ name: DEFAULT_ANIMATION, fps: FPS.default, frames: [blankFrame(width, height)], holds: [1] }],
   };
 }
 

@@ -36,16 +36,22 @@ const legend = (p: Project) =>
 /** Lo que "ve" el agente de un cuadro: cabecera, paleta y filas numeradas. */
 export function frameText(p: Project, animation: string, frame: number): string {
   const { a, rows } = findFrame(p, animation, frame);
+  const anim = p.animations[a]!;
   const pad = String(p.height - 1).length;
   return [
-    `${p.name}: animación '${animation}', cuadro ${frame} (hay ${p.animations[a]!.frames.length}, del 0 al ${p.animations[a]!.frames.length - 1}), lienzo ${p.width} × ${p.height}`,
+    `${p.name}: animación '${animation}', cuadro ${frame} (hay ${anim.frames.length}, del 0 al ${anim.frames.length - 1}; dura ${anim.holds[frame]} ${anim.holds[frame] === 1 ? 'tic' : 'tics'}), lienzo ${p.width} × ${p.height}`,
     `Paleta: ${legend(p)}`,
     ...rows.map((r, y) => `${String(y).padStart(pad, '0')} ${r}`),
   ].join('\n');
 }
 
 function summary(p: Project): string {
-  const anims = p.animations.map((a) => `'${a.name}' (${a.frames.length} ${a.frames.length === 1 ? 'cuadro' : 'cuadros'}, ${a.fps} fps)`).join(', ');
+  const anims = p.animations
+    .map((a) => {
+      const long = a.holds.some((h) => h > 1) ? `, duraciones [${a.holds.join(', ')}]` : '';
+      return `'${a.name}' (${a.frames.length} ${a.frames.length === 1 ? 'cuadro' : 'cuadros'}, ${a.fps} fps${long})`;
+    })
+    .join(', ');
   return `${p.id}: ${p.name}, ${p.width} × ${p.height}. Animaciones: ${anims}. Paleta: ${legend(p)}`;
 }
 
@@ -144,7 +150,8 @@ export function createAgentServer({ projects, canvas, activity }: Deps, perms: A
   tool(
     'add_frame',
     {
-      description: 'Añade un cuadro vacío, o una copia de copyOf, en la posición at (por defecto al final). Para animar, copia el cuadro anterior y modifícalo.',
+      description:
+        'Añade un cuadro vacío, o una copia de copyOf (con su duración), en la posición at (por defecto al final). Para animar, copia el cuadro anterior y modifícalo. Para una pausa no repitas cuadros: usa set_hold.',
       inputSchema: { project, animation, at: z.number().int().optional(), copyOf: z.number().int().optional() },
     },
     ({ project: id, ...args }) => run(id, 'addFrame', args),
@@ -154,6 +161,16 @@ export function createAgentServer({ projects, canvas, activity }: Deps, perms: A
     'delete_frame',
     { description: 'Borra un cuadro. La animación debe conservar al menos uno. Se puede deshacer con undo.', inputSchema: { project, animation, frame } },
     ({ project: id, ...args }) => run(id, 'deleteFrame', args),
+  );
+
+  tool(
+    'set_hold',
+    {
+      description:
+        'Cuántos tics dura un cuadro (1 tic = 1/fps segundos), de 1 a 60. Por defecto 1. Úsalo para pausas y momentos lentos en vez de repetir el mismo cuadro.',
+      inputSchema: { project, animation, frame, hold: z.number().int() },
+    },
+    ({ project: id, ...args }) => run(id, 'setHold', args),
   );
 
   tool(

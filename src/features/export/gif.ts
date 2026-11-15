@@ -74,7 +74,7 @@ function subBlocks(data: Uint8Array): number[] {
 /** GIF89a animado en bucle infinito. Índice 0 de la tabla = transparente; 1..n = paleta en orden. */
 export function exportGif(project: Project, input: { animation: string; scale?: number }): Uint8Array {
   const { animation, scale } = parse(GifInput, input);
-  const { fps, frames } = project.animations[findAnimation(project, animation)]!;
+  const { fps, frames, holds } = project.animations[findAnimation(project, animation)]!;
   const keys = Object.keys(project.palette);
   const tableBits = Math.max(2, Math.ceil(Math.log2(keys.length + 1)));
   const minBits = tableBits;
@@ -98,8 +98,7 @@ export function exportGif(project: Project, input: { animation: string; scale?: 
     0x21, 0xff, 11, ...Buffer.from('NETSCAPE2.0', 'ascii'), 3, 1, 0, 0, 0, // bucle infinito
   ];
 
-  const delay = Math.round(100 / fps);
-  for (const rows of frames) {
+  frames.forEach((rows, i) => {
     const pixels = new Uint8Array(w * h);
     rows.forEach((row, y) => {
       for (let x = 0; x < row.length; x++) {
@@ -108,10 +107,11 @@ export function exportGif(project: Project, input: { animation: string; scale?: 
         for (let dy = 0; dy < scale; dy++) pixels.fill(idx, (y * scale + dy) * w + x * scale, (y * scale + dy) * w + (x + 1) * scale);
       }
     });
+    const delay = Math.round((100 * holds[i]!) / fps); // centésimas de segundo
     bytes.push(0x21, 0xf9, 4, (2 << 2) | 1, ...word(delay), 0, 0); // GCE: disposal 2, transparencia
     bytes.push(0x2c, 0, 0, 0, 0, ...word(w), ...word(h), 0, minBits);
     for (const b of subBlocks(lzwEncode(pixels, minBits))) bytes.push(b);
-  }
+  });
   bytes.push(0x3b);
   return Uint8Array.from(bytes);
 }
